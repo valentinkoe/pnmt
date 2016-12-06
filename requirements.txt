@@ -1,0 +1,3 @@
+git+https://github.com/valentindey/async-train.git
+theano==0.8.2
+click==6.6
