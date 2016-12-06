@@ -99,13 +99,13 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
         dictionaries = [json.load(f1), json.load(f2)]
 
     logging.info("preparing training data streams from {}, {}".format(*train_data))
-    train_data_iter = TextIterator(*train_data, *dictionaries,
+    train_data_iter = TextIterator(train_data[0], train_data[1], dictionaries[0], dictionaries[1],
                                    n_words_source=n_words_source, n_words_target=n_words_target,
                                    batch_size=batch_size, maxlen=maxlen, raw_characters=characters)
     valid_data_iter = None
     if valid_data:
-        logging.info("preparing validation data streams from {}, {}".format(*train_data))
-        valid_data_iter = TextIterator(*valid_data, *dictionaries,
+        logging.info("preparing validation data streams from {}, {}".format(*valid_data))
+        valid_data_iter = TextIterator(valid_data[0], valid_data[1], dictionaries[0], dictionaries[1],
                                        n_words_source=n_words_source, n_words_target=n_words_target,
                                        batch_size=batch_size, maxlen=maxlen, raw_characters=characters)
 

@@ -27,6 +27,9 @@ are easily installed with pip
 
     pip install -r requirements.txt
 
+Different versions of python 3 *may* work, but this code was developed
+and tested for python 3.5.2.
+
 ## Data
 
 To download and prepare English to French translation data run the
@@ -67,8 +70,7 @@ versions.
 ## Translating Text
 
 Once you have trained a model, you can use it to translate text from
-the source language to the target language with the script
-`postprocessing/translate.py`
+the source language to the target language with the script `translate.py`.
 
 
 ## Results
