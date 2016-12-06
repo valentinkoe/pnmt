@@ -30,7 +30,7 @@ class TextIterator:
         self.n_words_target = n_words_target
 
         self.buffer = []
-        self.buffer_size = batch_size * 20
+        self.max_buffer_size = batch_size * 20
 
         self.raw_characters = raw_characters
 
@@ -53,27 +53,30 @@ class TextIterator:
         # fill buffer, if it's empty
         if not self.buffer:
             new_buffer = []
-            while len(new_buffer) < self.buffer_size:
-                # sentences should already be tokenized properly such that
-                # we can split tokens by white spaces
+            for _ in range(self.max_buffer_size):
                 try:
-                    if self.raw_characters:
-                        source_sentence = list(self.source.readline().strip())
-                        target_sentence = list(self.target.readline().strip())
-                    else:
-                        source_sentence = self.source.readline().strip().split()
-                        target_sentence = self.target.readline().strip().split()
+                    source_line = self.source.readline()
+                    target_line = self.target.readline()
                 except IOError:
                     self.end_of_data = True
                     break
-                if any(map(lambda x: len(x) > self.maxlen, (source_sentence, target_sentence))):
+
+                if source_line == "" or target_line == "":
+                    # this actually happens more often than one would think
+                    break
+
+                if self.raw_characters:
+                    source_sentence = list(source_line.strip())
+                    target_sentence = list(target_line.strip())
+                else:
+                    # sentences should already be tokenized properly such that
+                    # we can split tokens by white spaces
+                    source_sentence = source_line.strip().split()
+                    target_sentence = target_line.strip().split()
+
+                if len(source_sentence) > self.maxlen or len(target_sentence) > self.maxlen:
                     # encountered a too long sentence on at least one side
                     continue
-                if not all((source_sentence, target_sentence)):
-                    # TODO: if only one of the files lines was "" raise an error
-                    # or at least warn the user about incorrect file format
-                    # considering empty line to be eof
-                    break
 
                 new_buffer.append((source_sentence, target_sentence))
 
