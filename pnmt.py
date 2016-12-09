@@ -20,7 +20,7 @@ from async_train.utils import save_params
 from async_train import train_params
 
 from data_iterator import TextIterator
-from params import init_params
+from params import init_params, load_params
 from build_model import build_model
 
 
@@ -81,9 +81,13 @@ from build_model import build_model
 @click.option("--characters/--no-characters", default=False,
               help="when set, the model is trained on raw characters instead of words, make sure to "
                    "adjust other model parameters to this setting")
+@click.option("--resume-training", type=click.Path(exists=True, dir_okay=False), nargs=2,
+              help="resume training from the specified model, also requires the json file containing "
+                   "model options to verify these")
 def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequency, patience,
           encoder, decoder, dim_emb, dim_rnn, weight_dtype, n_words_source, n_words_target, maxlen,
-          decay_c, alpha_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters):
+          decay_c, alpha_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters,
+          resume_training):
     """
     Trains a Neural Machine Translation model with the specified parameters.
     Provides asynchronous optimization algorithms, see option --optimizer.
@@ -110,7 +114,29 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                        batch_size=batch_size, maxlen=maxlen, raw_characters=characters)
 
     logging.info("initializing weights")
-    params = init_params(n_words_source, n_words_target, dim_emb, dim_rnn, dtype=weight_dtype)
+    if resume_training:
+        params = load_params(resume_training[0])
+        # check if model options saved in json format match the current settings
+        with open(resume_training[1], "r") as f:
+            resume_options = json.load(f)
+        if not all([encoder == resume_options["encoder"],
+                    decoder == resume_options["decoder"],
+                    dim_emb == resume_options["dim_emb"],
+                    dim_rnn == resume_options["dim_rnn"],
+                    n_words_source == resume_options["n_words_source"],
+                    n_words_target == resume_options["n_words_target"],
+                    maxlen == resume_options["maxlen"],
+                    decay_c == resume_options["decay_c"],
+                    alpha_c == resume_options["alpha_c"],
+                    dropout == resume_options["dropout"],
+
+        ])
+
+        # encoder, decoder, dim_emb, dim_rnn, weight_dtype, n_words_source, n_words_target, maxlen,
+        # decay_c, alpha_c, dropout, batch_size, optimizer, devices, characters,
+        # necessary for the models size, rest could be different
+    else:
+        params = init_params(n_words_source, n_words_target, dim_emb, dim_rnn, dtype=weight_dtype)
 
     if optimizer in ["hogwild", "async_agrad", "async_da"]:
         logging.info("selected parallelizable optimizing algorithm {}, handing over to async-train".format(optimizer))
@@ -121,7 +147,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       valid_data=valid_data_iter, valid_freq=valid_frequency, patience=patience,
                                       save_to=save_to, save_freq=save_frequency,
                                       dim_emb=dim_emb, encoder=encoder, decoder=decoder,
-                                      dropout=dropout, n_words_target=n_words_target,
+                                      dropout=dropout, n_words_target=n_words_target, maxlen=maxlen,
                                       decay_c=decay_c, alpha_c=alpha_c)
 
     elif optimizer in ["sgd", "adagrad", "adadelta", "adam", "rmsprop"]:
@@ -146,6 +172,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                          "dropout": dropout,
                          "n_words_target": n_words_target,
                          "n_words_source": n_words_source,
+                         "maxlen": maxlen,
                          "decay_c": decay_c,
                          "alpha_c": alpha_c}
         with open(train_options_file, "w") as f:
