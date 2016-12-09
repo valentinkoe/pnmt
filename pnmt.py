@@ -128,9 +128,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                     maxlen == resume_options["maxlen"],
                     decay_c == resume_options["decay_c"],
                     alpha_c == resume_options["alpha_c"],
-                    dropout == resume_options["dropout"],
-
-        ])
+                    dropout == resume_options["dropout"]]):
+            raise ValueError("Option mismatch!")
 
         # encoder, decoder, dim_emb, dim_rnn, weight_dtype, n_words_source, n_words_target, maxlen,
         # decay_c, alpha_c, dropout, batch_size, optimizer, devices, characters,
