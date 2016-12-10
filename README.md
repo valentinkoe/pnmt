@@ -43,8 +43,8 @@ testing. Data for other language pairs is downloaded with this script
 as well. To prepare further data, adjust the commands in this script to
 your needs.
 
-For tekenization the `tokenizer.pl` from 
-moses](https://github.com/moses-smt/mosesdecoder) is used.
+For tekenization the `tokenizer.pl` script from 
+[moses](https://github.com/moses-smt/mosesdecoder) is used.
 
 
 ## Training a Model
