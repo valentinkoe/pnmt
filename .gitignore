@@ -3,3 +3,7 @@ __pycache__/
 *$py.class
 
 .idea/
+
+data/
+!data/build_dict.py
+!data/prepare_data.sh
