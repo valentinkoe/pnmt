@@ -108,14 +108,13 @@ class TextIterator:
         x, x_mask = self._to_matrix_with_mask(source_ss, self.maxlen, self.source_dict["eos"])
         y, y_mask = self._to_matrix_with_mask(target_ss, self.maxlen, self.target_dict["eos"])
 
-        # TODO: dynamic dtype
-        return x.astype("int32"), x_mask.astype("float32"), y.astype("int32"), y_mask.astype("float32")
+        return x, x_mask, y, y_mask
 
     @staticmethod
     def _to_matrix_with_mask(list_of_lists, maxlen, default_val):
         maxlen = maxlen+1
-        matr = default_val * np.ones((maxlen, len(list_of_lists)))
-        mask = np.zeros((maxlen, len(list_of_lists)))
+        matr = default_val * np.ones((maxlen, len(list_of_lists)), dtype="int32")
+        mask = np.zeros((maxlen, len(list_of_lists)), dtype="int32")
         for i, l in enumerate(list_of_lists):
             matr[:len(l), i] = l[:maxlen]
             mask[:len(l)+1, i] = 1

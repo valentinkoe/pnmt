@@ -42,12 +42,12 @@ from build_model import build_model
               help="type of encoder RNN")
 @click.option("--decoder", default="gru_cond", type=click.Choice(["gru", "gru_cond"]),
               help="type of decoder RNN")
+@click.option("--params-dtype", default="float32",
+              help="dtype of parameters, should match `theano.config.floatX`")
 @click.option("--dim-emb", default=100,
               help="word vector dimensionality for input and output language")
 @click.option("--dim-rnn", default=1000,
               help="number of RNN units for encoder and decoder")
-@click.option("--weight-dtype", default="float32",
-              help="the type of floating point weights, should be the same as theano.config.floatX")
 @click.option("--n-words-source", default=15000,
               help="source vocabulary size; only the n most frequent words are used, "
                    "rest is treated as unknown (special UNK token)")
@@ -55,7 +55,7 @@ from build_model import build_model
               help="target vocabulary size; only the n most frequent words are used, "
                    "rest is treated as unknown (special UNK token)")
 @click.option("--maxlen", default=50,
-              help="maximum length of sentences taken int account; if either the source "
+              help="maximum length of sentences taken into account; if either the source "
                    "or the target sentence is longer, the pair is dismissed")
 @click.option("--decay_c", default=0., help="L2 regularization penalty")
 @click.option("--alpha-c", default=0., help="alignment weight regularization")
@@ -85,7 +85,7 @@ from build_model import build_model
               help="resume training from the specified model, also requires the json file containing "
                    "model options to verify these")
 def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequency, patience,
-          encoder, decoder, dim_emb, dim_rnn, weight_dtype, n_words_source, n_words_target, maxlen,
+          encoder, decoder, params_dtype, dim_emb, dim_rnn, n_words_source, n_words_target, maxlen,
           decay_c, alpha_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters,
           resume_training):
     """
@@ -130,12 +130,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                     alpha_c == resume_options["alpha_c"],
                     dropout == resume_options["dropout"]]):
             raise ValueError("Option mismatch!")
-
-        # encoder, decoder, dim_emb, dim_rnn, weight_dtype, n_words_source, n_words_target, maxlen,
-        # decay_c, alpha_c, dropout, batch_size, optimizer, devices, characters,
-        # necessary for the models size, rest could be different
     else:
-        params = init_params(n_words_source, n_words_target, dim_emb, dim_rnn, dtype=weight_dtype)
+        params = init_params(n_words_source, n_words_target, dim_emb, dim_rnn, dtype=params_dtype)
 
     if optimizer in ["hogwild", "async_agrad", "async_da"]:
         logging.info("selected parallelizable optimizing algorithm {}, handing over to async-train".format(optimizer))
@@ -146,12 +142,11 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       valid_data=valid_data_iter, valid_freq=valid_frequency, patience=patience,
                                       save_to=save_to, save_freq=save_frequency,
                                       dim_emb=dim_emb, encoder=encoder, decoder=decoder,
-                                      dropout=dropout, n_words_target=n_words_target, maxlen=maxlen,
-                                      decay_c=decay_c, alpha_c=alpha_c)
+                                      n_words_target=n_words_target, n_words_source=n_words_source, maxlen=maxlen,
+                                      params_dtype=params_dtype, dropout=dropout, decay_c=decay_c, alpha_c=alpha_c)
 
     elif optimizer in ["sgd", "adagrad", "adadelta", "adam", "rmsprop"]:
         logging.info("selected sequential optimizer {}".format(optimizer))
-
 
         dir_path = os.path.dirname(save_to)
         if dir_path and not os.path.exists(dir_path):
@@ -176,7 +171,6 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                          "alpha_c": alpha_c}
         with open(train_options_file, "w") as f:
             json.dump(train_options, f, indent=4)
-
 
         # get callable optimizer function
         import seq_optimizers

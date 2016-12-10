@@ -33,9 +33,8 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
     logging.info("building and compiling theano functions")
     _, _, (f_init_vars, f_next_vars) = build_model(tparams, **model_options)
 
-    # TODO: downcast
-    f_init = theano.function(*f_init_vars, allow_input_downcast=True)
-    f_next = theano.function(*f_next_vars, allow_input_downcast=True)
+    f_init = theano.function(*f_init_vars)
+    f_next = theano.function(*f_next_vars)
 
     # generate sample, either with stochastic sampling or beam search as given to its parent function
     def gen_sample(x):
@@ -50,12 +49,12 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
         dead_k = 0
 
         hyp_samples = [[]] * live_k
-        hyp_scores = np.zeros(live_k).astype(theano.config.floatX)
+        hyp_scores = np.zeros(live_k, dtype=theano.config.floatX)
 
         # get initial state of decoder rnn and encoder context
         ret = f_init(x)
         next_state, ctx0 = ret[0], ret[1]
-        next_w = -1 * np.ones((1,)).astype("int64")  # indicates beginning of sentence
+        next_w = -1 * np.ones((1,), dtype="int32")  # indicates beginning of sentence
 
         for _ in range(maxlen):
             ctx = np.tile(ctx0, [live_k, 1])
@@ -83,7 +82,7 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
                 costs = cand_flat[ranks_flat]
 
                 new_hyp_samples = []
-                new_hyp_scores = np.zeros(k-dead_k).astype(theano.config.floatX)
+                new_hyp_scores = np.zeros(k-dead_k, dtype=theano.config.floatX)
                 new_hyp_states = []
 
                 for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
@@ -115,7 +114,7 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
                 if dead_k >= k:
                     break
 
-                next_w = np.array([w[-1] for w in hyp_samples])
+                next_w = np.array([w[-1] for w in hyp_samples], dtype="int32")
                 next_state = np.array(hyp_states)
 
         if not stochastic:
@@ -139,11 +138,11 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
 
         # words to idxs + trailing zero for eos
         x = np.array([idx if idx < model_options["n_words_source"] else 1
-                     for idx in [dictionaries[0].get(w, 1) for w in x]] + [0])
+                     for idx in [dictionaries[0].get(w, 1) for w in x]] + [0],
+                     dtype="int32")
 
         # idx list to vector
-        # TODO: dtype
-        x = x.reshape((len(x), 1)).astype("int32")
+        x = x.reshape((len(x), 1))
 
         # translate
         translation, score = gen_sample(x)  # yields sample AND score as tuple
@@ -186,12 +185,12 @@ def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
     with open(model_files[0], "r") as f:
         model_options = json.load(f)
 
+    global dictionaries
+    global dictionaries_rev
     logging.info("loading dictionaries from {}, {}".format(*dicts))
     with open(dicts[0], "r") as f1, open(dicts[1], "r") as f2:
         dictionaries = [json.load(f1), json.load(f2)]
-    global dictionaries
     dictionaries_rev = [{v: k for k, v in d.items()} for d in dictionaries]
-    global dictionaries_rev
 
     # special tokens are
     # "UNK" ~ 1
@@ -206,15 +205,15 @@ def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
 
     n_lines = len(lines)
 
-    in_queue = Queue()
     global in_queue
-    out_queue = Queue()
     global out_queue
+    in_queue = Queue()
+    out_queue = Queue()
 
-    processes = [Process(target=translation_process, name="x",
+    processes = [Process(target=translation_process, name="process_{}".format(n),
                          args=(params, beam_size, maxlen, stochastic, argmax, characters),
                          kwargs=model_options)
-                 for _ in range(num_threads)]
+                 for n in range(num_threads)]
 
     for p in processes:
         p.daemon = True
@@ -230,7 +229,7 @@ def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
     for num_processed in range(n_lines):
         result.append(out_queue.get())
         percentage_done = (num_processed / n_lines)*100
-        print("{}% processed".format(percentage_done), end="\r", flush=True)  # TODO: formatting floating point precision
+        print("{:.2f}% of input translated".format(percentage_done), end="\r", flush=True)
     # got the translations with their indices in the original file
     # need to sort them again, because the order may be messed up due to multiple processes
     result = sorted(result, key=lambda x: x[0])

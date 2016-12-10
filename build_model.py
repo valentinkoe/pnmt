@@ -87,7 +87,7 @@ def build_model(tparams, **kwargs):
         dim = tparams[get_layer_name(prefix, "Ux")].shape[1]
 
         if mask is None:
-            mask = T.alloc(1., state_below.shape[0], 1)
+            mask = T.ones((state_below.shape[0], 1))
 
         # utility function to slice a tensor
         def _slice(_x, n, dim):
@@ -129,7 +129,7 @@ def build_model(tparams, **kwargs):
 
         # prepare scan arguments
         seqs = [mask, state_below_, state_belowx]
-        init_states = [T.alloc(0., n_samples, dim)]
+        init_states = [T.zeros((n_samples, dim))]
         _step = _step_slice
         shared_vars = [tparams[get_layer_name(prefix, "U")],
                        tparams[get_layer_name(prefix, "Ux")]]
@@ -160,13 +160,13 @@ def build_model(tparams, **kwargs):
 
         # mask
         if mask is None:
-            mask = T.alloc(1., state_below.shape[0], 1)
+            mask = T.ones((state_below.shape[0], 1))
 
         dim = tparams[get_layer_name(prefix, "Wcx")].shape[1]
 
         # initial/previous state
         if init_state is None:
-            init_state = T.alloc(0., n_samples, dim)
+            init_state = T.zeros((n_samples, dim))
 
         # projected context
         assert context.ndim == 3, \
@@ -258,10 +258,8 @@ def build_model(tparams, **kwargs):
             rval, updates = theano.scan(_step,
                                         sequences=seqs,
                                         outputs_info=[init_state,
-                                                      T.alloc(0., n_samples,
-                                                              context.shape[2]),
-                                                      T.alloc(0., n_samples,
-                                                              context.shape[0])],
+                                                      T.zeros((n_samples, context.shape[2])),
+                                                      T.zeros((n_samples, context.shape[0]))],
                                         non_sequences=[pctx_, context] + shared_vars,
                                         name=get_layer_name(prefix, "_layers"),
                                         n_steps=nsteps,
@@ -274,13 +272,15 @@ def build_model(tparams, **kwargs):
 
     # description string: #words x #samples
     x = T.imatrix("x")
-    x_mask = T.matrix("x_mask")
+    x_mask = T.imatrix("x_mask")
+    x_mask_f = T.cast(x_mask, dtype=theano.config.floatX)
     y = T.imatrix("y")
-    y_mask = T.matrix("y_mask")
+    y_mask = T.imatrix("y_mask")
+    y_mask_f = T.cast(y_mask, dtype=theano.config.floatX)
 
     # for the backward rnn, we just need to invert x and x_mask
     xr = x[::-1]
-    xr_mask = x_mask[::-1]
+    xr_mask = x_mask_f[::-1]
 
     n_timesteps = x.shape[0]
     n_timesteps_trg = y.shape[0]
@@ -289,7 +289,7 @@ def build_model(tparams, **kwargs):
     # word embedding for forward rnn (source)
     emb = tparams["Wemb"][x.flatten()]
     emb = emb.reshape([n_timesteps, n_samples, kwargs["dim_emb"]])
-    proj = layer_apply_funcs[kwargs["encoder"]](tparams, emb, prefix="encoder", mask=x_mask)
+    proj = layer_apply_funcs[kwargs["encoder"]](tparams, emb, prefix="encoder", mask=x_mask_f)
 
     # word embedding for backward rnn (source)
     embr = tparams["Wemb"][xr.flatten()]
@@ -300,7 +300,7 @@ def build_model(tparams, **kwargs):
     ctx = concatenate([proj[0], projr[0][::-1]], axis=proj[0].ndim - 1)
 
     # mean of the context (across time) will be used to initialize decoder rnn
-    ctx_mean = (ctx * x_mask[:, :, None]).sum(0) / x_mask.sum(0)[:, None]
+    ctx_mean = (ctx * x_mask_f[:, :, None]).sum(0) / x_mask_f.sum(0)[:, None]
 
     # or you can use the last state of forward + backward encoder rnns
     # ctx_mean = concatenate([proj[0][-1], projr[0][-1]], axis=proj[0].ndim-2)
@@ -319,8 +319,8 @@ def build_model(tparams, **kwargs):
     emb = emb_shifted
 
     # decoder - pass through the decoder conditional gru with attention
-    proj = layer_apply_funcs[kwargs["decoder"]](tparams, emb, prefix="decoder", mask=y_mask,
-                                                context=ctx, context_mask=x_mask,
+    proj = layer_apply_funcs[kwargs["decoder"]](tparams, emb, prefix="decoder", mask=y_mask_f,
+                                                context=ctx, context_mask=x_mask_f,
                                                 one_step=False, init_state=init_state)
 
     # hidden states of the decoder gru
@@ -337,8 +337,8 @@ def build_model(tparams, **kwargs):
     logit_prev = layer_apply_funcs["ff"](tparams, emb, prefix="ff_logit_prev", activ=linear)
     logit_ctx = layer_apply_funcs["ff"](tparams, ctxs, prefix="ff_logit_ctx", activ=linear)
     logit = T.tanh(logit_rnn + logit_prev + logit_ctx)
-    if kwargs.get("dropout", False):
-        logit = dropout_layer(logit, theano.shared(1.))
+    if "dropout" in kwargs:
+        logit = dropout_layer(logit, theano.shared(np.array(1., dtype=theano.config.floatX)))
     logit = layer_apply_funcs["ff"](tparams, logit, prefix="ff_logit", activ=linear)
     logit_shp = logit.shape
     probs = T.nnet.softmax(logit.reshape([logit_shp[0] * logit_shp[1], logit_shp[2]]))
@@ -348,7 +348,7 @@ def build_model(tparams, **kwargs):
     y_flat_idx = T.arange(y_flat.shape[0]) * kwargs["n_words_target"] + y_flat
     cost = -T.log(probs.flatten()[y_flat_idx])
     cost = cost.reshape([y.shape[0], y.shape[1]])
-    cost = (cost * y_mask).sum(0)
+    cost = (cost * y_mask_f).sum(0)
 
     cost = cost.mean()
 
@@ -365,7 +365,7 @@ def build_model(tparams, **kwargs):
     if kwargs.get("alpha_c", 0.) > 0.:
         alpha_c = theano.shared(kwargs["alpha_c"], name="alpha_c")
         alpha_reg = alpha_c * (
-            (y_mask.sum(0)//x_mask.sum(0)[:, None] -
+            (y_mask_f.sum(0)//x_mask_f.sum(0)[:, None] -
              dec_alphas.sum(0))**2).sum(1).mean()
         cost += alpha_reg
 
@@ -387,7 +387,7 @@ def build_model(tparams, **kwargs):
     decoder_in_sampler = T.ivector()
     init_state_sampler = T.matrix()
     emb_sampler = T.switch(decoder_in_sampler[:, None] < 0,
-                           T.alloc(0., 1, tparams["Wemb_dec"].shape[1]),
+                           T.zeros((1, tparams["Wemb_dec"].shape[1])),
                            tparams["Wemb_dec"][decoder_in_sampler])
 
     proj_decoder_sampler = layer_apply_funcs[kwargs["decoder"]](tparams,
@@ -410,7 +410,7 @@ def build_model(tparams, **kwargs):
                                             prefix="ff_logit", activ=linear)
 
     next_probs_sampler = T.nnet.softmax(logit_sampler)
-    next_sample_sampler = TRNG.multinomial(pvals=next_probs_sampler).argmax(1)
+    next_sample_sampler = T.cast(TRNG.multinomial(pvals=next_probs_sampler).argmax(1), dtype="int32")
 
     f_next_graph = ([decoder_in_sampler, ctx_sampler, init_state_sampler],
                     [next_probs_sampler, next_sample_sampler, next_state_sampler])

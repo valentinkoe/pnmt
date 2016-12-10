@@ -7,19 +7,16 @@ implementations of sequential algorithms with a common signature
 
     optimizer(learning_rate, theano_params, gradients, list_of_inputs, cost)
 
-returning two functions 'f_grad_shared' computing the gradients, preparing
-the update and 'f_update' to eventually apply the update
+returning two functions 'f_grad_shared' computing the gradients and preparing
+the update and 'f_update' to eventually apply this update
 
 to preserve the same interface, 'on_unused_input="ignore"' is set as parameter
 for 'f_update' for algorithms that do not require an initial learning rate
 """
 
 
-# TODO: check types and make them dynamic
-
 def sgd(lr, tparams, grads, inp, cost):
-    gshared = [theano.shared(p.get_value() * np.float32(0.),
-                             name="{}_grad".format(k))
+    gshared = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
                for k, p in tparams.items()]
     gsup = zip(gshared, grads)
 
@@ -51,7 +48,7 @@ def adagrad(lr, tparams, grads, inp, cost):
 
 
 def adam(lr, tparams, grads, inp, cost):
-    gshared = [theano.shared(p.get_value() * np.float32(0.),
+    gshared = [theano.shared(np.zeros_like(p.get_value(), dtype=theano.config.floatX),
                              name="{}_grad".format(k))
                for k, p in tparams.items()]
     gsup = zip(gshared, grads)
@@ -65,7 +62,7 @@ def adam(lr, tparams, grads, inp, cost):
 
     updates = []
 
-    i = theano.shared(np.float32(0.))
+    i = theano.shared(np.array(0., dtype=theano.config.floatX))
     i_t = i + 1.
     fix1 = 1. - b1**(i_t)
     fix2 = 1. - b2**(i_t)
@@ -89,14 +86,11 @@ def adam(lr, tparams, grads, inp, cost):
 
 
 def adadelta(lr, tparams, grads, inp, cost):
-    zipped_grads = [theano.shared(p.get_value() * np.float32(0.),
-                                  name="{}_grad".format(k))
+    zipped_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
                     for k, p in tparams.items()]
-    running_up2 = [theano.shared(p.get_value() * np.float32(0.),
-                                 name="{}_rup2".format(k))
+    running_up2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rup2".format(k))
                    for k, p in tparams.items()]
-    running_grads2 = [theano.shared(p.get_value() * np.float32(0.),
-                                    name="{}_rgrad2".format(k))
+    running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
     zgup = zip(zipped_grads, grads)
@@ -118,14 +112,11 @@ def adadelta(lr, tparams, grads, inp, cost):
 
 
 def rmsprop(lr, tparams, grads, inp, cost):
-    zipped_grads = [theano.shared(p.get_value() * np.float32(0.),
-                                  name="{}_grad".format(k))
+    zipped_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
                     for k, p in tparams.items()]
-    running_grads = [theano.shared(p.get_value() * np.float32(0.),
-                                   name="{}_rgrad".format(k))
+    running_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad".format(k))
                      for k, p in tparams.items()]
-    running_grads2 = [theano.shared(p.get_value() * np.float32(0.),
-                                    name="{}_rgrad2".format(k))
+    running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
     zgup = zip(zipped_grads, grads)
@@ -135,8 +126,7 @@ def rmsprop(lr, tparams, grads, inp, cost):
 
     f_grad_shared = theano.function(inp, cost, updates=zgup+rgup+rg2up)
 
-    updir = [theano.shared(p.get_value() * np.float32(0.),
-                           name="{}_updir".format(k))
+    updir = [theano.shared(np.zeros_like(p.get_value()), name="{}_updir".format(k))
              for k, p in tparams.items()]
     updir_new = [(ud, 0.9 * ud - 1e-4 * zg / T.sqrt(rg2 - rg ** 2 + 1e-4))
                  for ud, zg, rg, rg2 in zip(updir, zipped_grads, running_grads,

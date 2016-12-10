@@ -59,12 +59,9 @@ For more options, see
 
     ./pnmt.py --help
 
-When calling the script directly, remember to set the floating point
-precision of theano. You can either set this in your `.theanorc` file
-or with the environment variable `THEANO_FLAGS`.
-Currently all scripts are tailored to use `float32` and other values
-most certainly will result in errors. This will get fixed in future
-versions.
+Make sure that the option `--params-dtype` matches theano's `floatX`.
+This must be set separately due to theano's config not being accessible
+prior to the compilation of the model for each concurrent process.
 
 
 ## Translating Text
