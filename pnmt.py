@@ -2,19 +2,11 @@
 
 import json
 import os
+import logging
 from collections import OrderedDict
 
 import click
-
 import numpy as np
-
-import logging
-from datetime import datetime
-log_file = datetime.now().strftime('%Y-%m-%d_%H:%M:%S') + "_pnmt.log"
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s %(module)s - %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S",
-                    handlers=[logging.FileHandler(log_file), logging.StreamHandler()])
 
 from async_train.utils import save_params
 from async_train import train_params
@@ -22,6 +14,10 @@ from async_train import train_params
 from data_iterator import TextIterator
 from params import init_params, load_params
 from build_model import build_model
+
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s %(module)s - %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
 
 
 @click.command()
@@ -84,10 +80,14 @@ from build_model import build_model
 @click.option("--resume-training", type=click.Path(exists=True, dir_okay=False), nargs=2,
               help="resume training from the specified model, also requires the json file containing "
                    "model options to verify these")
+@click.option("--log-file", default=None, type=click.Path(exists=False, dir_okay=False),
+              help="file to write logs to in addition to stdout")
+@click.option("--display-frequency", default=1000,
+              help="show a short message after this many updates")
 def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequency, patience,
           encoder, decoder, params_dtype, dim_emb, dim_rnn, n_words_source, n_words_target, maxlen,
           decay_c, alpha_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters,
-          resume_training):
+          resume_training, log_file, display_frequency):
     """
     Trains a Neural Machine Translation model with the specified parameters.
     Provides asynchronous optimization algorithms, see option --optimizer.
@@ -96,7 +96,9 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
     with `str.split`. Not necessary for character based models.
     """
 
-    logging.info("logging to {}".format(log_file))
+    if log_file:
+        logging.getLogger().addHandler(logging.FileHandler(log_file))
+        logging.info("logging to {}".format(log_file))
 
     logging.info("loading dictionaries from {}, {}".format(*dicts))
     with open(dicts[0], 'r') as f1, open(dicts[1], 'r') as f2:
@@ -143,7 +145,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       save_to=save_to, save_freq=save_frequency,
                                       dim_emb=dim_emb, encoder=encoder, decoder=decoder,
                                       n_words_target=n_words_target, n_words_source=n_words_source, maxlen=maxlen,
-                                      params_dtype=params_dtype, dropout=dropout, decay_c=decay_c, alpha_c=alpha_c)
+                                      params_dtype=params_dtype, dropout=dropout, decay_c=decay_c, alpha_c=alpha_c,
+                                      display_freq=display_frequency)
 
     elif optimizer in ["sgd", "adagrad", "adadelta", "adam", "rmsprop"]:
         logging.info("selected sequential optimizer {}".format(optimizer))
@@ -227,7 +230,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                 f_update(l_rate)
                 update_idx += 1
 
-                if update_idx % 1000 == 0:
+                if update_idx % display_frequency == 0:
                     logging.info("epoch {} update {}, cost of last processed batch: {}"
                                  .format(epoch_idx, update_idx, cost))
 
