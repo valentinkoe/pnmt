@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+import os
+import re
 import json
 import logging
 from multiprocessing import Process, Queue, current_process
@@ -43,12 +45,6 @@ def error_process(params, **model_options):
         out_queue.put(f_cost(*cur_data))
 
 
-@click.command()
-@click.argument("model-files", type=click.Path(exists=True, dir_okay=False), nargs=2)
-@click.argument("dicts", type=click.Path(exists=True, dir_okay=False), nargs=2)
-@click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
-@click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
-@click.option("--num-threads", default=4, help="number of threads to use for error calculation")
 def get_error(model_files, dicts, source_file, target_file, num_threads):
 
     logging.info("Loading model options from {}".format(model_files[0]))
@@ -64,7 +60,6 @@ def get_error(model_files, dicts, source_file, target_file, num_threads):
 
     logging.info("loading parameters from {}".format(model_files[1]))
     params = load_params(model_files[1])
-
 
     global in_queue
     global out_queue
@@ -108,5 +103,57 @@ def get_error(model_files, dicts, source_file, target_file, num_threads):
     return mean_cost
 
 
+
+
+
+command_group = click.Group()
+
+
+@command_group.command()
+@click.argument("model-files", type=click.Path(exists=True, dir_okay=False), nargs=2)
+@click.argument("dicts", type=click.Path(exists=True, dir_okay=False), nargs=2)
+@click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
+@click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--num-threads", default=4, help="number of threads to use for error calculation")
+def eval_one_model(model_files, dicts, source_file, target_file, num_threads):
+    get_error(model_files, dicts, source_file, target_file, num_threads)
+
+
+@command_group.command()
+@click.argument("model-dir", type=click.Path(exists=True, dir_okay=True))
+@click.argument("dicts", type=click.Path(exists=True, dir_okay=False), nargs=2)
+@click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
+@click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--num-threads", default=4, help="number of threads to use for error calculation")
+def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads):
+    """requires a directory containing npz files and *one* json file with model
+    options that is valid for all these files
+    npz files should be named XXX_epoch_EPOCH_update_UPDATE.npz"""
+
+
+    # this needs to recompile the model for every model file and each process
+    # but otherwise this would require more complicated handling of subprocesses...
+
+    files = [os.path.join(model_dir, f) for f in os.listdir(model_dir)
+             if os.path.isfile(os.path.join(model_dir, f))]
+    model_npzs = [f for f in files if os.path.splitext(f)[1] == ".npz"]
+    model_option_file = [f for f in files if os.path.splitext(f)[1] == ".json"][0]
+
+    name_format = re.compile(r"epoch_(.+?)_update_(.+?)\.npz")  # TODO: as command line argument
+    costs = []
+    for i, m in enumerate(model_npzs, 1):
+        re_match = re.search(name_format, m)
+        epoch = int(re_match.group(1))
+        update = int(re_match.group(2))
+        time = os.path.getmtime(m)
+        cost = get_error((model_option_file, m), dicts, source_file, target_file, num_threads)
+        costs.append((time, epoch, update, cost, m))
+        print("processed {}/{} models".format(i, len(model_npzs)))
+    costs = sorted(costs, key=lambda x: x[0])
+
+    for m_info in costs:
+        print("\t".join(map(str, m_info)))
+
+
 if __name__ == '__main__':
-    get_error()
+    command_group()
