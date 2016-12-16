@@ -97,7 +97,10 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
     """
 
     if log_file:
-        logging.getLogger().addHandler(logging.FileHandler(log_file))
+        f_handler = logging.FileHandler(log_file)
+        f_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s %(module)s - %(message)s",
+                                                 datefmt="%Y-%m-%d %H:%M:%S"))
+        logging.getLogger().addHandler(f_handler)
         logging.info("logging to {}".format(log_file))
 
     logging.info("loading dictionaries from {}, {}".format(*dicts))
@@ -130,7 +133,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                     maxlen == resume_options["maxlen"],
                     decay_c == resume_options["decay_c"],
                     alpha_c == resume_options["alpha_c"],
-                    dropout == resume_options["dropout"]]):
+                    dropout == resume_options["dropout"],
+                    characters == resume_options["characters"]]):
             raise ValueError("Option mismatch!")
     else:
         params = init_params(n_words_source, n_words_target, dim_emb, dim_rnn, dtype=params_dtype)
@@ -146,7 +150,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       dim_emb=dim_emb, encoder=encoder, decoder=decoder,
                                       n_words_target=n_words_target, n_words_source=n_words_source, maxlen=maxlen,
                                       params_dtype=params_dtype, dropout=dropout, decay_c=decay_c, alpha_c=alpha_c,
-                                      display_freq=display_frequency)
+                                      display_freq=display_frequency, characters=characters)
 
     elif optimizer in ["sgd", "adagrad", "adadelta", "adam", "rmsprop"]:
         logging.info("selected sequential optimizer {}".format(optimizer))
@@ -171,7 +175,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                          "n_words_source": n_words_source,
                          "maxlen": maxlen,
                          "decay_c": decay_c,
-                         "alpha_c": alpha_c}
+                         "alpha_c": alpha_c,
+                         "characters": characters}
         with open(train_options_file, "w") as f:
             json.dump(train_options, f, indent=4)
 

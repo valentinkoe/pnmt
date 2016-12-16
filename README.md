@@ -69,6 +69,13 @@ prior to the compilation of the model for each concurrent process.
 Once you have trained a model, you can use it to translate text from
 the source language to the target language with the script `translate.py`.
 
+Note that this is only deterministic when run with `--num-threads` set 
+to 1 (and thus being slower).
+For other settings the order of processing sentences can not be
+guaranteed. Due to the use of a random number generator which yields
+results dependent on that order, the resulting translations may differ.
+The order of output translations is ensured to match the order
+of the input sentences nevertheless!
 
 ## Results
 

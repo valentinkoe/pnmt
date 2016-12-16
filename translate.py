@@ -2,7 +2,7 @@
 
 import json
 import logging
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, current_process
 from collections import OrderedDict
 from copy import copy
 
@@ -22,7 +22,7 @@ import multiprocessing_logging
 multiprocessing_logging.install_mp_handler()
 
 
-def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, characters=False, **model_options):
+def translation_process(params, k=1, stochastic=True, argmax=False, **model_options):
 
     import theano
 
@@ -30,14 +30,15 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
     for param_name, param in params.items():
         tparams[param_name] = theano.shared(param, name=param_name)
 
-    logging.info("building and compiling theano functions")
+    process_name = current_process().name
+    logging.info("building and compiling theano functions ({})".format(process_name))
     _, _, (f_init_vars, f_next_vars) = build_model(tparams, **model_options)
 
     f_init = theano.function(*f_init_vars)
     f_next = theano.function(*f_next_vars)
 
     # generate sample, either with stochastic sampling or beam search as given to its parent function
-    def gen_sample(x):
+    def translate_sample(x):
         """given the functions f_init and f_next translates the sentence representation x"""
 
         sample = []
@@ -56,7 +57,7 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
         next_state, ctx0 = ret[0], ret[1]
         next_w = -1 * np.ones((1,), dtype="int32")  # indicates beginning of sentence
 
-        for _ in range(maxlen):
+        for _ in range(model_options["maxlen"]):
             ctx = np.tile(ctx0, [live_k, 1])
             inps = [next_w, ctx, next_state]
             ret = f_next(*inps)
@@ -85,9 +86,9 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
                 new_hyp_scores = np.zeros(k-dead_k, dtype=theano.config.floatX)
                 new_hyp_states = []
 
-                for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+                for i, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                     new_hyp_samples.append(hyp_samples[ti]+[wi])
-                    new_hyp_scores[idx] = copy(costs[idx])
+                    new_hyp_scores[i] = copy(costs[i])
                     new_hyp_states.append(copy(next_state[ti]))
 
                 # check the finished samples
@@ -96,16 +97,16 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
                 hyp_scores = []
                 hyp_states = []
 
-                for idx in range(len(new_hyp_samples)):
-                    if new_hyp_samples[idx][-1] == 0:
-                        sample.append(new_hyp_samples[idx])
-                        sample_score.append(new_hyp_scores[idx])
+                for i in range(len(new_hyp_samples)):
+                    if new_hyp_samples[i][-1] == 0:
+                        sample.append(new_hyp_samples[i])
+                        sample_score.append(new_hyp_scores[i])
                         dead_k += 1
                     else:
                         new_live_k += 1
-                        hyp_samples.append(new_hyp_samples[idx])
-                        hyp_scores.append(new_hyp_scores[idx])
-                        hyp_states.append(new_hyp_states[idx])
+                        hyp_samples.append(new_hyp_samples[i])
+                        hyp_scores.append(new_hyp_scores[i])
+                        hyp_states.append(new_hyp_states[i])
                 hyp_scores = np.array(hyp_scores)
                 live_k = new_live_k
 
@@ -126,40 +127,44 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
 
         return sample, sample_score
 
+    # fetch samples from the input queue, translate them and push them to the output queue
+    # until a stop signal is received
     while True:
         cur_data = in_queue.get()
         if cur_data == "STOP":
             break
 
-        idx, x = cur_data
+        sample_idx, sample = cur_data
 
-        # split
-        x = list(x) if characters else x.split()
+        # split into units (characters or tokens)
+        sample = list(sample) if model_options["characters"] else sample.split()
 
-        # words to idxs + trailing zero for eos
-        x = np.array([idx if idx < model_options["n_words_source"] else 1
-                     for idx in [dictionaries[0].get(w, 1) for w in x]] + [0],
-                     dtype="int32")
+        # words to word_idxs + trailing zero for eos
+        sample = np.array([widx if widx < model_options["n_words_source"] else 1
+                           for widx in [dictionaries[0].get(w, 1) for w in sample]] + [0],
+                          dtype="int32")
 
         # idx list to vector
-        x = x.reshape((len(x), 1))
+        sample = sample.reshape((len(sample), 1))
 
         # translate
-        translation, score = gen_sample(x)  # yields sample AND score as tuple
+        widx_translation, score = translate_sample(sample)  # yields sample AND score as tuple
 
         # to words
         def to_words(sample):
             words = []
-            for idx in sample:
-                if idx == 0:  # reached eos
+            for widx in sample:
+                if widx == 0:  # reached eos
                     break
-                words.append(dictionaries_rev[1][idx])
+                words.append(dictionaries_rev[1][widx])
             return words
 
-        translation = " ".join(to_words(translation))
+        translation = to_words(widx_translation)
+
+        translation = "".join(translation) if model_options["characters"] else " ".join(translation)
 
         # join
-        out_queue.put((idx, translation))
+        out_queue.put((sample_idx, translation))
 
 
 @click.command()
@@ -169,17 +174,13 @@ def translation_process(params, k=1, maxlen=30, stochastic=True, argmax=False, c
 @click.argument("output-file", type=click.Path(exists=False, dir_okay=False))
 @click.option("--beam-size", default=5, help="beam size when using beam search, "
                                              "has no effect when using stochastic sampling")
-@click.option("--maxlen", default=50, help="maximum length of sentences")
 @click.option("--stochastic/--no-stochastic", default=True,
               help="whether to use stochastic sampling or not")
 @click.option("--argmax/--no-argmax", default=False,
               help="using just the the max probability for stochastic sampling")
-@click.option("--characters/--no-characters", default=False,
-              help="when set, the model is trained on raw characters instead of words, make sure to "
-                   "adjust other model parameters to this setting")
 @click.option("--num-threads", default=4, help="number of threads to use for translation")
-def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
-              stochastic, argmax, characters, num_threads):
+def translate(model_files, input_file, output_file, dicts, beam_size,
+              stochastic, argmax, num_threads):
 
     logging.info("Loading model options from {}".format(model_files[0]))
     with open(model_files[0], "r") as f:
@@ -199,19 +200,13 @@ def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
     logging.info("loading parameters from {}".format(model_files[1]))
     params = load_params(model_files[1])
 
-    logging.info("loading {}".format(input_file))
-    with open(input_file, "r") as f:
-        lines = f.readlines()
-
-    n_lines = len(lines)
-
     global in_queue
     global out_queue
     in_queue = Queue()
     out_queue = Queue()
 
     processes = [Process(target=translation_process, name="process_{}".format(n),
-                         args=(params, beam_size, maxlen, stochastic, argmax, characters),
+                         args=(params, beam_size, stochastic, argmax),
                          kwargs=model_options)
                  for n in range(num_threads)]
 
@@ -219,8 +214,12 @@ def translate(model_files, input_file, output_file, dicts, beam_size, maxlen,
         p.daemon = True
         p.start()
 
-    for idx, line in enumerate(lines):
-        in_queue.put((idx, line))
+    logging.info("translating {}".format(input_file))
+    n_lines = 0
+    with open(input_file, "r") as f:
+        for line_idx, line in enumerate(f):
+            in_queue.put((line_idx, line))
+            n_lines += 1
 
     for _ in processes:
         in_queue.put("STOP")
