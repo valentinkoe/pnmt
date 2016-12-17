@@ -125,7 +125,9 @@ def eval_one_model(model_files, dicts, source_file, target_file, num_threads):
 @click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
 @click.option("--num-threads", default=4, help="number of threads to use for error calculation")
-def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads):
+@click.option("--out-file", type=click.Path(exists=False, dir_okay=False),
+              help="writes output to this file additional to stdout")
+def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads, out_file):
     """requires a directory containing npz files and *one* json file with model
     options that is valid for all these files
     npz files should be named XXX_epoch_EPOCH_update_UPDATE.npz"""
@@ -140,19 +142,24 @@ def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads
     model_option_file = [f for f in files if os.path.splitext(f)[1] == ".json"][0]
 
     name_format = re.compile(r"epoch_(.+?)_update_(.+?)\.npz")  # TODO: as command line argument
-    costs = []
+    m_infos = []
     for i, m in enumerate(model_npzs, 1):
         re_match = re.search(name_format, m)
         epoch = int(re_match.group(1))
         update = int(re_match.group(2))
         time = os.path.getmtime(m)
         cost = get_error((model_option_file, m), dicts, source_file, target_file, num_threads)
-        costs.append((time, epoch, update, cost, m))
+        m_infos.append((time, epoch, update, cost, m))
         print("processed {}/{} models".format(i, len(model_npzs)))
-    costs = sorted(costs, key=lambda x: x[0])
+    m_infos = sorted(m_infos, key=lambda x: x[0])
 
-    for m_info in costs:
+    for m_info in m_infos:
         print("\t".join(map(str, m_info)))
+    if out_file:
+        with open(out_file, "w") as f:
+            f.write("time,epoch,update,cost,model\n")
+            for m_info in m_infos:
+                f.write(",".join(map(str, m_info)) + "\n")
 
 
 if __name__ == '__main__':
