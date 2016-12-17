@@ -239,7 +239,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                     logging.info("epoch {} update {}, cost of last processed batch: {}"
                                  .format(epoch_idx, update_idx, cost))
 
-                if update_idx % valid_frequency == 0:
+                if update_idx % valid_frequency == 0 and valid_data:
                     # FIXME: set noise to 0 if used
                     cur_valid_error = np.mean([f_grad_shared(*d) for d in valid_data_iter])
                     if cur_valid_error < best_valid_error:
