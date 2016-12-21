@@ -13,7 +13,6 @@ import click
 
 from data_iterator import TextIterator
 from params import load_params
-from build_model import build_model
 
 
 logging.basicConfig(level=logging.WARN,
@@ -24,9 +23,13 @@ import multiprocessing_logging
 multiprocessing_logging.install_mp_handler()
 
 
-def error_process(params, **model_options):
+def error_process(params, device, **model_options):
 
     import theano
+    import theano.sandbox.cuda
+    from build_model import build_model
+
+    theano.sandbox.cuda.use(device)
 
     tparams = OrderedDict()
     for param_name, param in params.items():
@@ -45,7 +48,7 @@ def error_process(params, **model_options):
         out_queue.put(f_cost(*cur_data))
 
 
-def get_error(model_files, dicts, source_file, target_file, num_threads):
+def get_error(model_files, dicts, source_file, target_file, devices):
 
     logging.info("Loading model options from {}".format(model_files[0]))
     with open(model_files[0], "r") as f:
@@ -66,9 +69,9 @@ def get_error(model_files, dicts, source_file, target_file, num_threads):
     in_queue = Queue()
     out_queue = Queue()
 
-    processes = [Process(target=error_process, name="process_{}".format(n),
-                         args=(params,), kwargs=model_options)
-                 for n in range(num_threads)]
+    processes = [Process(target=error_process, name="process_{}".format(device),
+                         args=(params, device), kwargs=model_options)
+                 for device in devices.split(",")]
 
     for p in processes:
         p.daemon = True
@@ -79,7 +82,7 @@ def get_error(model_files, dicts, source_file, target_file, num_threads):
                       maxlen=model_options["maxlen"],
                       n_words_source=model_options["n_words_source"],
                       n_words_target=model_options["n_words_target"],
-                      raw_characters=model_options["characters"])  # TODO
+                      raw_characters=model_options["characters"])
 
     num_batches = 0
     for batch in ti:
@@ -114,9 +117,12 @@ command_group = click.Group()
 @click.argument("dicts", type=click.Path(exists=True, dir_okay=False), nargs=2)
 @click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
-@click.option("--num-threads", default=4, help="number of threads to use for error calculation")
+@click.option("--devices", default="cpu,cpu,cpu,cpu",
+              help="comma separated list of devices to run training with the asynchronous "
+                   "algorithms; see `'theano.sandbox.cuda.run'`for more information; "
+                   "only the first one is used in case a sequential optimization algorithm is used")
 def eval_one_model(model_files, dicts, source_file, target_file, num_threads):
-    get_error(model_files, dicts, source_file, target_file, num_threads)
+    get_error(model_files, dicts, source_file, target_file, devices)
 
 
 @command_group.command()
@@ -124,10 +130,13 @@ def eval_one_model(model_files, dicts, source_file, target_file, num_threads):
 @click.argument("dicts", type=click.Path(exists=True, dir_okay=False), nargs=2)
 @click.argument("source-file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("target-file", type=click.Path(exists=True, dir_okay=False))
-@click.option("--num-threads", default=4, help="number of threads to use for error calculation")
+@click.option("--devices", default="cpu,cpu,cpu,cpu",
+              help="comma separated list of devices to run training with the asynchronous "
+                   "algorithms; see `'theano.sandbox.cuda.run'`for more information; "
+                   "only the first one is used in case a sequential optimization algorithm is used")
 @click.option("--out-file", type=click.Path(exists=False, dir_okay=False),
               help="writes output to this file additional to stdout")
-def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads, out_file):
+def eval_multiple_models(model_dir, dicts, source_file, target_file, devices, out_file):
     """requires a directory containing npz files and *one* json file with model
     options that is valid for all these files
     npz files should be named XXX_epoch_EPOCH_update_UPDATE.npz"""
@@ -148,7 +157,7 @@ def eval_multiple_models(model_dir, dicts, source_file, target_file, num_threads
         epoch = int(re_match.group(1))
         update = int(re_match.group(2))
         time = os.path.getmtime(m)
-        cost = get_error((model_option_file, m), dicts, source_file, target_file, num_threads)
+        cost = get_error((model_option_file, m), dicts, source_file, target_file, devices)
         m_infos.append((time, epoch, update, cost, m))
         print("processed {}/{} models".format(i, len(model_npzs)))
     m_infos = sorted(m_infos, key=lambda x: x[0])

@@ -11,7 +11,6 @@ import numpy as np
 import click
 
 from params import load_params
-from build_model import build_model
 
 
 logging.basicConfig(level=logging.INFO,
@@ -22,9 +21,13 @@ import multiprocessing_logging
 multiprocessing_logging.install_mp_handler()
 
 
-def translation_process(params, k=1, stochastic=True, argmax=False, **model_options):
+def translation_process(device, params, k=1, stochastic=True, argmax=False, **model_options):
 
     import theano
+    import theano.sandbox.cuda
+    from build_model import build_model
+
+    theano.sandbox.cuda.use(device)
 
     tparams = OrderedDict()
     for param_name, param in params.items():
@@ -178,9 +181,12 @@ def translation_process(params, k=1, stochastic=True, argmax=False, **model_opti
               help="whether to use stochastic sampling or not")
 @click.option("--argmax/--no-argmax", default=False,
               help="using just the the max probability for stochastic sampling")
-@click.option("--num-threads", default=4, help="number of threads to use for translation")
+@click.option("--devices", default="cpu,cpu,cpu,cpu",
+              help="comma separated list of devices to run training with the asynchronous "
+                   "algorithms; see `'theano.sandbox.cuda.run'`for more information; "
+                   "only the first one is used in case a sequential optimization algorithm is used")
 def translate(model_files, input_file, output_file, dicts, beam_size,
-              stochastic, argmax, num_threads):
+              stochastic, argmax, devices):
 
     logging.info("Loading model options from {}".format(model_files[0]))
     with open(model_files[0], "r") as f:
@@ -205,10 +211,10 @@ def translate(model_files, input_file, output_file, dicts, beam_size,
     in_queue = Queue()
     out_queue = Queue()
 
-    processes = [Process(target=translation_process, name="process_{}".format(n),
-                         args=(params, beam_size, stochastic, argmax),
+    processes = [Process(target=translation_process, name="process_{}".format(device),
+                         args=(device, params, beam_size, stochastic, argmax),
                          kwargs=model_options)
-                 for n in range(num_threads)]
+                 for device in devices.split(",")]
 
     for p in processes:
         p.daemon = True

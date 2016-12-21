@@ -9,6 +9,7 @@ export THEANO_FLAGS=floatX=float32
 MODEL_LOC=$1
 OPTIMIZER=$2
 DEVICES=$3
+LOGF=$4
 
 ./pnmt.py \
   data/europarl-v7.fr-en.en.train.tok \
@@ -24,7 +25,8 @@ DEVICES=$3
   --n-words-target 15000 \
   --epochs 500 \
   --batch-size 64 \
-  --save-frequency 300
+  --save-frequency 5000 \
+  --log-file ${LOGF}
 
 
 #  --lrate ${LEARNING_RATE}
