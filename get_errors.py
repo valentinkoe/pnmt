@@ -121,7 +121,7 @@ command_group = click.Group()
               help="comma separated list of devices to run training with the asynchronous "
                    "algorithms; see `'theano.sandbox.cuda.run'`for more information; "
                    "only the first one is used in case a sequential optimization algorithm is used")
-def eval_one_model(model_files, dicts, source_file, target_file, num_threads):
+def eval_one_model(model_files, dicts, source_file, target_file, devices):
     get_error(model_files, dicts, source_file, target_file, devices)
 
 

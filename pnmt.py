@@ -58,7 +58,7 @@ logging.basicConfig(level=logging.INFO,
 @click.option("--dropout/--no-dropout", default=False,
               help="whether to use dropout or not; currently only on the last layer; "
                    "currently not switched off for validation!!!")  # TODO
-@click.option("--l_rate", default=.01, help="(initial) learning rate")
+@click.option("--l-rate", default=.01, help="(initial) learning rate")
 @click.option("--epochs", default=1000, help="number of maximum training epochs")
 @click.option("--batch-size", default=64, help="size of data batches used for training")
 @click.option("--optimizer", default="sgd", type=click.Choice(["hogwild",
