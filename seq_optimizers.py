@@ -18,9 +18,9 @@ for 'f_update' for algorithms that do not require an initial learning rate
 def sgd(lr, tparams, grads, inp, cost):
     gshared = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
                for k, p in tparams.items()]
-    gsup = zip(gshared, grads)
+    gsup = list(zip(gshared, grads))
 
-    f_grad_shared = theano.function(inp, cost, updates=list(gsup))
+    f_grad_shared = theano.function(inp, cost, updates=gsup)
 
     pup = [(p, p - lr * g) for p, g in zip(tparams.values(), gshared)]
     f_update = theano.function([lr], [], updates=pup)
@@ -34,10 +34,10 @@ def adagrad(lr, tparams, grads, inp, cost):
     accumulated_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(pname))
                          for pname, p in tparams.items()]
 
-    zgup = zip(zipped_grads, grads)
+    zgup = list(zip(zipped_grads, grads))
     agup = [(rg, rg + (g ** 2)) for rg, g in zip(accumulated_grads, grads)]
 
-    f_grad_shared = theano.function(inp, cost, updates=zgup + agup,)
+    f_grad_shared = theano.function(inp, cost, updates=zgup+agup,)
 
     param_up = [(p, p - ((lr/T.sqrt(ag+.00001))*g))
                 for p, g, ag in zip(tparams.values(), zipped_grads, accumulated_grads)]
@@ -51,9 +51,9 @@ def adam(lr, tparams, grads, inp, cost):
     gshared = [theano.shared(np.zeros_like(p.get_value(), dtype=theano.config.floatX),
                              name="{}_grad".format(k))
                for k, p in tparams.items()]
-    gsup = zip(gshared, grads)
+    gsup = list(zip(gshared, grads))
 
-    f_grad_shared = theano.function(inp, cost, updates=list(gsup))
+    f_grad_shared = theano.function(inp, cost, updates=gsup)
 
     lr0 = 0.0002
     b1 = 0.1
@@ -64,8 +64,8 @@ def adam(lr, tparams, grads, inp, cost):
 
     i = theano.shared(np.array(0., dtype=theano.config.floatX))
     i_t = i + 1.
-    fix1 = 1. - b1**(i_t)
-    fix2 = 1. - b2**(i_t)
+    fix1 = 1. - b1**i_t
+    fix2 = 1. - b2**i_t
     lr_t = lr0 * (T.sqrt(fix2) / fix1)
 
     for p, g in zip(tparams.values(), gshared):
@@ -93,7 +93,7 @@ def adadelta(lr, tparams, grads, inp, cost):
     running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
-    zgup = zip(zipped_grads, grads)
+    zgup = list(zip(zipped_grads, grads))
     rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
              for rg2, g in zip(running_grads2, grads)]
 
@@ -119,7 +119,7 @@ def rmsprop(lr, tparams, grads, inp, cost):
     running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
-    zgup = zip(zipped_grads, grads)
+    zgup = list(zip(zipped_grads, grads))
     rgup = [(rg, 0.95 * rg + 0.05 * g) for rg, g in zip(running_grads, grads)]
     rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
              for rg2, g in zip(running_grads2, grads)]
