@@ -55,6 +55,7 @@ logging.basicConfig(level=logging.INFO,
                    "or the target sentence is longer, the pair is dismissed")
 @click.option("--decay_c", default=0., help="L2 regularization penalty")
 @click.option("--alpha-c", default=0., help="alignment weight regularization")
+@click.option("--clip-c", default=0., help="gradient clipping value")
 @click.option("--dropout/--no-dropout", default=False,
               help="whether to use dropout or not; currently only on the last layer; "
                    "currently not switched off for validation!!!")  # TODO
@@ -86,7 +87,7 @@ logging.basicConfig(level=logging.INFO,
               help="show a short message after this many updates")
 def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequency, patience,
           encoder, decoder, params_dtype, dim_emb, dim_rnn, n_words_source, n_words_target, maxlen,
-          decay_c, alpha_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters,
+          decay_c, alpha_c, clip_c, dropout, l_rate, epochs, batch_size, optimizer, devices, characters,
           resume_training, log_file, display_frequency):
     """
     Trains a Neural Machine Translation model with the specified parameters.
@@ -203,17 +204,15 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       decay_c=decay_c, alpha_c=alpha_c)
         grads = T.grad(cost, wrt=list(tparams.values()))
 
-        # TODO: gradient clipping
-        # if clip_c > 0.:
-        #     g2 = 0.
-        #     for g in grads:
-        #         g2 += (g**2).sum()
-        #     new_grads = []
-        #     for g in grads:
-        #         new_grads.append(T.switch(g2 > (clip_c**2),
-        #                                        g / T.sqrt(g2) * clip_c,
-        #                                        g))
-        #     grads = new_grads
+        if clip_c > 0.:
+            grads_squard_sum = 0.
+            for g in grads:
+                grads_squard_sum += (g**2).sum()
+            new_grads = [T.switch(grads_squard_sum > (clip_c**2),
+                                  g / T.sqrt(grads_squard_sum) * clip_c,
+                                  g)
+                         for g in grads]
+            grads = new_grads
 
         logging.info("compiling model")
         learning_rate = T.scalar("learning_rate")
