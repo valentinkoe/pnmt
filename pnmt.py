@@ -150,7 +150,8 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                       save_to=save_to, save_freq=save_frequency,
                                       dim_emb=dim_emb, encoder=encoder, decoder=decoder,
                                       n_words_target=n_words_target, n_words_source=n_words_source, maxlen=maxlen,
-                                      params_dtype=params_dtype, dropout=dropout, decay_c=decay_c, alpha_c=alpha_c,
+                                      params_dtype=params_dtype, dropout=dropout,
+                                      decay_c=decay_c, alpha_c=alpha_c, clip_c=clip_c,
                                       display_freq=display_frequency, characters=characters)
 
     elif optimizer in ["sgd", "adagrad", "adadelta", "adam", "rmsprop"]:
@@ -177,6 +178,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                          "maxlen": maxlen,
                          "decay_c": decay_c,
                          "alpha_c": alpha_c,
+                         "clip_c": clip_c,
                          "characters": characters}
         with open(train_options_file, "w") as f:
             json.dump(train_options, f, indent=4)
@@ -208,11 +210,10 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
             grads_squard_sum = 0.
             for g in grads:
                 grads_squard_sum += (g**2).sum()
-            new_grads = [T.switch(grads_squard_sum > (clip_c**2),
-                                  g / T.sqrt(grads_squard_sum) * clip_c,
-                                  g)
-                         for g in grads]
-            grads = new_grads
+            grads = [T.switch(grads_squard_sum > (clip_c**2),
+                              g / T.sqrt(grads_squard_sum) * clip_c,
+                              g)
+                     for g in grads]
 
         logging.info("compiling model")
         learning_rate = T.scalar("learning_rate")
