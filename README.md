@@ -63,6 +63,7 @@ Make sure that the option `--params-dtype` matches theano's `floatX`.
 This must be set separately due to theano's config not being accessible
 prior to the compilation of the model for each concurrent process.
 
+For comparison common (non-parallel) optimizing algorithms are also supplied.
 
 ## Translating Text
 
@@ -85,10 +86,19 @@ algorithms for training NMT models.
 An overview of results so far can be found in [my thesis](thesis.pdf)
 (section 6.5). Note that these correspond to no "real-world settings".
 
-I'm currently heavily working on some more meaningful benchmarks.
+Some further experimentation shows the increase of training speed on
+GPUs very well.
+A translation model (europarl corpus, english to french) showed the
+following trajectories for cost/bleu score measured on some validation
+data:
 
+![valid cost](results/valid_cost.png)
 
-### references
+![valid bleu score](results/valid_bleu.png)
+
+These results were achieved with Nvidia GeForce GTX 1080 GPUs
+
+## References
 
 <a name="ref1">[1]</a> Recht, B., Re, C., Wright, S., & Niu, F. (2011). 
  Hogwild: A lock-free approach to parallelizing stochastic gradient descent. 
