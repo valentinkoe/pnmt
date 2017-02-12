@@ -10,7 +10,7 @@ OUT_FILE=$4
 ./translate.py \
   ${MODEL_OPTS} \
   ${MODEL} \
-  data/europarl-v7.fr-en.en.tok.dct.json \
-  data/europarl-v7.fr-en.fr.tok.dct.json \
+  data/europarl/europarl-v7.fr-en.en.tok.dct.json \
+  data/europarl/europarl-v7.fr-en.fr.tok.dct.json \
   ${IN_FILE} \
   ${OUT_FILE}

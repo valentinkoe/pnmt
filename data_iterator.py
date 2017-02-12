@@ -16,8 +16,9 @@ class TextIterator:
     def __init__(self, source_file, target_file,
                  source_dict, target_dict,
                  batch_size=128, maxlen=100,
-                 n_words_source=-1, n_words_target=-1,
+                 n_words_source=None, n_words_target=None,
                  raw_characters=False):
+
         self.source = f_open(source_file, "r")
         self.target = f_open(target_file, "r")
         self.source_dict = source_dict
@@ -26,8 +27,8 @@ class TextIterator:
         self.batch_size = batch_size
         self.maxlen = maxlen
 
-        self.n_words_source = n_words_source
-        self.n_words_target = n_words_target
+        self.n_words_source = n_words_source or len(source_dict)
+        self.n_words_target = n_words_target or len(target_dict)
 
         self.buffer = []
         self.max_buffer_size = batch_size * 20

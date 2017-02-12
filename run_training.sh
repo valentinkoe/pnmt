@@ -12,12 +12,13 @@ DEVICES=$3
 LOGF=$4
 
 ./pnmt.py \
-  data/europarl-v7.fr-en.en.train.tok \
-  data/europarl-v7.fr-en.fr.train.tok \
-  data/europarl-v7.fr-en.en.tok.dct.json \
-  data/europarl-v7.fr-en.fr.tok.dct.json \
+  data/europarl/europarl-v7.fr-en.en.tok.top_1997723 \
+  data/europarl/europarl-v7.fr-en.fr.tok.top_1997723 \
+  data/europarl/europarl-v7.fr-en.en.tok.dct.json \
+  data/europarl/europarl-v7.fr-en.fr.tok.dct.json \
   ${MODEL_LOC} \
   --optimizer ${OPTIMIZER} \
+  --l-rate 0.1 \
   --devices ${DEVICES} \
   --dim-emb 100 \
   --dim-rnn 1000 \
@@ -25,8 +26,6 @@ LOGF=$4
   --n-words-target 15000 \
   --epochs 500 \
   --batch-size 64 \
-  --save-frequency 5000 \
-  --log-file ${LOGF}
-
-
-#  --lrate ${LEARNING_RATE}
+  --save-frequency 4500 \
+  --log-file ${LOGF} \
+  --clip-c 5

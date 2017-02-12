@@ -6,5 +6,5 @@ __pycache__/
 
 data/
 !data/build_dict.py
-!data/prepare_europarl_data.sh
-!data/prepare_ted_data.sh
+!data/prepare_*.sh
+!data/splitN.sh

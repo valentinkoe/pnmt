@@ -170,6 +170,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                          "save_to": save_to,
                          "patience": patience,
                          "dim_emb": dim_emb,
+                         "dim_rnn": dim_rnn,
                          "encoder": encoder,
                          "decoder": decoder,
                          "dropout": dropout,
