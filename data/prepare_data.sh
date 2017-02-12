@@ -5,7 +5,7 @@
 # test set: newsets 2011
 # validation part of data is taken from train set
 
-echo "generating english-french data"
+echo "generating english-french europarl data"
 
 echo "downloading europarl v7 data... (if not already present)"
 wget -c -q http://www.statmt.org/europarl/v7/fr-en.tgz
@@ -54,15 +54,18 @@ if [ ! -f europarl-v7.fr-en.fr.train.tok ]; then
     mv x01 europarl-v7.fr-en.fr.valid.tok
 fi
 
-# generate dictionaries, for word and character based translation
+# generate word dictionaries
 for f in "europarl-v7.fr-en.en.tok" "europarl-v7.fr-en.fr.tok"; do
     if [ ! -f $f.dct.json ]; then
         echo "generating word dictionary for $f"
         ./build_dict.py $f $f.dct.json
     fi
+done
+
+# generate char dictionaries
+for  f in "europarl-v7.fr-en.en" "europarl-v7.fr-en.fr"; do
     if [ ! -f $f.char.dct.json ]; then
         echo "generating char dictionary for $f"
         ./build_dict.py --char-dict $f $f.char.dct.json
     fi
 done
-
