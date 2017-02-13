@@ -92,9 +92,9 @@ A translation model (europarl corpus, english to french) showed the
 following trajectories for cost/bleu score measured on some validation
 data:
 
-![valid cost](results/valid_cost.png | width=100)
+<img src="results/valid_cost.png" alt="valid cost" width="200">
 
-![valid bleu score](results/valid_bleu.png | width=100)
+<img src="results/valid_bleu.png" alt="valid bleu" width="200">
 
 These results were achieved with Nvidia GeForce GTX 1080 GPUs
 
