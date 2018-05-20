@@ -142,13 +142,13 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
 
     if optimizer in ["hogwild", "async_agrad", "async_da"]:
         logging.info("selected parallelizable optimizing algorithm {}, handing over to async-train".format(optimizer))
-        # saving, validation and logging is taken care of by async_train.train_params
+        # saving, validation and logging is taken care of by async_train.train_params # TODO: set noise to 0 if used
         trained_params = train_params(params, build_model, data=train_data_iter,
                                       devices=devices.split(","), update_scheme=optimizer,
                                       num_epochs=epochs, l_rate=l_rate, log_level=30, log_file=log_file,
                                       valid_data=valid_data_iter, valid_freq=valid_frequency, patience=patience,
                                       save_to=save_to, save_freq=save_frequency,
-                                      dim_emb=dim_emb, encoder=encoder, decoder=decoder,
+                                      dim_emb=dim_emb, dim_rnn=dim_rnn, encoder=encoder, decoder=decoder,
                                       n_words_target=n_words_target, n_words_source=n_words_source, maxlen=maxlen,
                                       params_dtype=params_dtype, dropout=dropout,
                                       decay_c=decay_c, alpha_c=alpha_c, clip_c=clip_c,
@@ -198,7 +198,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
         def pull_from_tparams(param_dict):
             params = OrderedDict()
             for param_name, param in param_dict.items():
-                params[param_name] = param.get_value()
+                params[param_name] = param.value()
             return params
 
         logging.info("building model")
@@ -241,7 +241,7 @@ def train(train_data, dicts, save_to, save_frequency, valid_data, valid_frequenc
                                  .format(epoch_idx, update_idx, cost))
 
                 if update_idx % valid_frequency == 0 and valid_data:
-                    # FIXME: set noise to 0 if used
+                    # TODO: set noise to 0 if used
                     cur_valid_error = np.mean([f_grad_shared(*d) for d in valid_data_iter])
                     if cur_valid_error < best_valid_error:
                         best_params = pull_from_tparams(tparams)

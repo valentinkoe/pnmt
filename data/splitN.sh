@@ -22,6 +22,8 @@ fi
 
 splitAt=$(expr ${NUM_LINES} - ${N})
 
+echo "splitting last ${N} lines from ${FILE}"
+
 split -l ${splitAt} -d ${FILE}
 mv x00 ${FILE}.top_${splitAt}
 mv x01 ${FILE}.last_${N}

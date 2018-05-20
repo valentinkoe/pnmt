@@ -50,9 +50,9 @@ def _param_init_gru(nin, dim_rnn, prefix="gru"):
 
 
 # Conditional GRU layer with Attention
-def param_init_gru_cond(nin, dim_rnn, dimctx,
-                        prefix="gru_cond",
-                        nin_nonlin=None, dim_nonlin=None):
+def _param_init_gru_cond(nin, dim_rnn, dimctx,
+                         prefix="gru_cond",
+                         nin_nonlin=None, dim_nonlin=None):
 
     if nin_nonlin is None:
         nin_nonlin = nin
@@ -104,7 +104,7 @@ def init_params(n_words_src, n_words_target, dim_emb, dim_rnn, dtype="float32"):
     # init_state, init_cell
     params.update(_param_init_fflayer(prefix="ff_state", nin=ctxdim, nout=dim_rnn))
     # decoder
-    params.update(param_init_gru_cond(prefix="decoder", nin=dim_emb, dim_rnn=dim_rnn, dimctx=ctxdim))
+    params.update(_param_init_gru_cond(prefix="decoder", nin=dim_emb, dim_rnn=dim_rnn, dimctx=ctxdim))
     # readout
     params.update(_param_init_fflayer(prefix="ff_logit_rnn", nin=dim_rnn, nout=dim_emb, ortho=False))
     params.update(_param_init_fflayer(prefix="ff_logit_prev", nin=dim_emb, nout=dim_emb, ortho=False))

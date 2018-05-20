@@ -11,6 +11,13 @@ OPTIMIZER=$2
 DEVICES=$3
 LOGF=$4
 
+# for this to run, prepare the fr-en europarl data
+# and split the last 10k sentences for validation
+#   cd data
+#   ./prepare_europarl_data.sh fr en
+#   ./splitN.sh europarl/europarl-v7.fr-en.fr.tok 10000
+#   ./splitN.sh europarl/europarl-v7.fr-en.en.tok 10000
+
 ./pnmt.py \
   data/europarl/europarl-v7.fr-en.en.tok.top_1997723 \
   data/europarl/europarl-v7.fr-en.fr.tok.top_1997723 \

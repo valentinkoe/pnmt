@@ -32,18 +32,11 @@ and tested for python 3.5.2.
 
 ## Data
 
-To download and prepare English to French translation data run the
-following commands
+To download and prepare some parallel corpora you can use the shell
+scripts in `data`.
+To prepare further data, you can adjust these script to your needs.
 
-    cd data
-    ./prepare_data.sh
-
-This downloads and prepares WMT data for training and newstest 2011 for
-testing. Data for other language pairs is downloaded with this script
-as well. To prepare further data, adjust the commands in this script to
-your needs.
-
-For tekenization the `tokenizer.pl` script from 
+For tokenization the `tokenizer.pl` script from 
 [moses](https://github.com/moses-smt/mosesdecoder) is used.
 
 

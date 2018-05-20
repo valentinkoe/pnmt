@@ -16,7 +16,7 @@ for 'f_update' for algorithms that do not require an initial learning rate
 
 
 def sgd(lr, tparams, grads, inp, cost):
-    gshared = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
+    gshared = [theano.shared(np.zeros_like(p.value()), name="{}_grad".format(k))
                for k, p in tparams.items()]
     gsup = list(zip(gshared, grads))
 
@@ -29,9 +29,9 @@ def sgd(lr, tparams, grads, inp, cost):
 
 
 def adagrad(lr, tparams, grads, inp, cost):
-    zipped_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(pname))
+    zipped_grads = [theano.shared(np.zeros_like(p.value()), name="{}_grad".format(pname))
                     for pname, p in tparams.items()]
-    accumulated_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(pname))
+    accumulated_grads = [theano.shared(np.zeros_like(p.value()), name="{}_grad".format(pname))
                          for pname, p in tparams.items()]
 
     zgup = list(zip(zipped_grads, grads))
@@ -48,14 +48,14 @@ def adagrad(lr, tparams, grads, inp, cost):
 
 
 def adam(lr, tparams, grads, inp, cost):
-    gshared = [theano.shared(np.zeros_like(p.get_value(), dtype=theano.config.floatX),
+    gshared = [theano.shared(np.zeros_like(p.value(), dtype=theano.config.floatX),
                              name="{}_grad".format(k))
                for k, p in tparams.items()]
     gsup = list(zip(gshared, grads))
 
     f_grad_shared = theano.function(inp, cost, updates=gsup)
 
-    lr0 = 0.0002
+    #lr0 = 0.0002
     b1 = 0.1
     b2 = 0.001
     e = 1e-8
@@ -66,11 +66,11 @@ def adam(lr, tparams, grads, inp, cost):
     i_t = i + 1.
     fix1 = 1. - b1**i_t
     fix2 = 1. - b2**i_t
-    lr_t = lr0 * (T.sqrt(fix2) / fix1)
+    lr_t = lr * (T.sqrt(fix2) / fix1)
 
     for p, g in zip(tparams.values(), gshared):
-        m = theano.shared(p.get_value() * 0.)
-        v = theano.shared(p.get_value() * 0.)
+        m = theano.shared(p.value() * 0.)
+        v = theano.shared(p.value() * 0.)
         m_t = (b1 * g) + ((1. - b1) * m)
         v_t = (b2 * T.sqr(g)) + ((1. - b2) * v)
         g_t = m_t / (T.sqrt(v_t) + e)
@@ -86,11 +86,11 @@ def adam(lr, tparams, grads, inp, cost):
 
 
 def adadelta(lr, tparams, grads, inp, cost):
-    zipped_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
+    zipped_grads = [theano.shared(np.zeros_like(p.value()), name="{}_grad".format(k))
                     for k, p in tparams.items()]
-    running_up2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rup2".format(k))
+    running_up2 = [theano.shared(np.zeros_like(p.value()), name="{}_rup2".format(k))
                    for k, p in tparams.items()]
-    running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
+    running_grads2 = [theano.shared(np.zeros_like(p.value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
     zgup = list(zip(zipped_grads, grads))
@@ -112,11 +112,11 @@ def adadelta(lr, tparams, grads, inp, cost):
 
 
 def rmsprop(lr, tparams, grads, inp, cost):
-    zipped_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_grad".format(k))
+    zipped_grads = [theano.shared(np.zeros_like(p.value()), name="{}_grad".format(k))
                     for k, p in tparams.items()]
-    running_grads = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad".format(k))
+    running_grads = [theano.shared(np.zeros_like(p.value()), name="{}_rgrad".format(k))
                      for k, p in tparams.items()]
-    running_grads2 = [theano.shared(np.zeros_like(p.get_value()), name="{}_rgrad2".format(k))
+    running_grads2 = [theano.shared(np.zeros_like(p.value()), name="{}_rgrad2".format(k))
                       for k, p in tparams.items()]
 
     zgup = list(zip(zipped_grads, grads))
@@ -126,7 +126,7 @@ def rmsprop(lr, tparams, grads, inp, cost):
 
     f_grad_shared = theano.function(inp, cost, updates=zgup+rgup+rg2up)
 
-    updir = [theano.shared(np.zeros_like(p.get_value()), name="{}_updir".format(k))
+    updir = [theano.shared(np.zeros_like(p.value()), name="{}_updir".format(k))
              for k, p in tparams.items()]
     updir_new = [(ud, 0.9 * ud - 1e-4 * zg / T.sqrt(rg2 - rg ** 2 + 1e-4))
                  for ud, zg, rg, rg2 in zip(updir, zipped_grads, running_grads,

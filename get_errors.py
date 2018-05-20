@@ -55,11 +55,9 @@ def get_error(model_files, dicts, source_file, target_file, devices):
         model_options = json.load(f)
 
     global dictionaries
-    global dictionaries_rev
     logging.info("loading dictionaries from {}, {}".format(*dicts))
     with open(dicts[0], "r") as f1, open(dicts[1], "r") as f2:
         dictionaries = [json.load(f1), json.load(f2)]
-    dictionaries_rev = [{v: k for k, v in d.items()} for d in dictionaries]
 
     logging.info("loading parameters from {}".format(model_files[1]))
     params = load_params(model_files[1])
@@ -136,7 +134,10 @@ def eval_one_model(model_files, dicts, source_file, target_file, devices):
                    "only the first one is used in case a sequential optimization algorithm is used")
 @click.option("--out-file", type=click.Path(exists=False, dir_okay=False),
               help="writes output to this file additional to stdout")
-def eval_multiple_models(model_dir, dicts, source_file, target_file, devices, out_file):
+@click.option("--name-format", default=r"epoch_(.+?)_update_(.+?)\.npz",
+              help="format of model names as regex to parse number of updates (first mathcing group)"
+                   "and number of epochs (second matching group) from")
+def eval_multiple_models(model_dir, dicts, source_file, target_file, devices, out_file, name_format):
     """requires a directory containing npz files and *one* json file with model
     options that is valid for all these files
     npz files should be named XXX_epoch_EPOCH_update_UPDATE.npz"""
@@ -150,16 +151,19 @@ def eval_multiple_models(model_dir, dicts, source_file, target_file, devices, ou
     model_npzs = [f for f in files if os.path.splitext(f)[1] == ".npz"]
     model_option_file = [f for f in files if os.path.splitext(f)[1] == ".json"][0]
 
-    name_format = re.compile(r"epoch_(.+?)_update_(.+?)\.npz")  # TODO: as command line argument
+    nf = re.compile(name_format)
     m_infos = []
     for i, m in enumerate(model_npzs, 1):
-        re_match = re.search(name_format, m)
-        epoch = int(re_match.group(1))
-        update = int(re_match.group(2))
-        time = os.path.getmtime(m)
-        cost = get_error((model_option_file, m), dicts, source_file, target_file, devices)
-        m_infos.append((time, epoch, update, cost, m))
-        print("processed {}/{} models".format(i, len(model_npzs)))
+        re_match = re.search(nf, m)
+        if re_match:
+            epoch = int(re_match.group(1))
+            update = int(re_match.group(2))
+            time = os.path.getmtime(m)
+            cost = get_error((model_option_file, m), dicts, source_file, target_file, devices)
+            m_infos.append((time, epoch, update, cost, m))
+            print("processed {}/{} models".format(i, len(model_npzs)))
+        else:
+            print("{} did not match name format!".format(m))
     m_infos = sorted(m_infos, key=lambda x: x[0])
 
     for m_info in m_infos:

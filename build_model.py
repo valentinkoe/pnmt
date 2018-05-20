@@ -57,7 +57,6 @@ def build_model(tparams, **kwargs):
 
         return out
 
-    # dropout
     def dropout_layer(state_before, noise):
         proj = T.switch(
             noise,
@@ -141,8 +140,7 @@ def build_model(tparams, **kwargs):
                                     name=get_layer_name(prefix, "_layers"),
                                     n_steps=nsteps,
                                     strict=True)
-        rval = [rval]
-        return rval
+        return [rval]
 
     def gru_cond_layer(tparams, state_below, prefix="gru",
                        mask=None, context=None, one_step=False,
@@ -211,7 +209,7 @@ def build_model(tparams, **kwargs):
             pctx__ = T.tanh(pctx__)
             alpha = T.dot(pctx__, U_att) + c_tt
             alpha = alpha.reshape([alpha.shape[0], alpha.shape[1]])
-            alpha = T.exp(alpha)
+            alpha = T.exp(alpha)  # TODO: check, may cause NaNs
             if context_mask:
                 alpha = alpha * context_mask
             alpha = alpha / alpha.sum(0, keepdims=True)
@@ -346,7 +344,12 @@ def build_model(tparams, **kwargs):
     # cost
     y_flat = y.flatten()
     y_flat_idx = T.arange(y_flat.shape[0]) * kwargs["n_words_target"] + y_flat
-    cost = -T.log(probs.flatten()[y_flat_idx])
+
+    # clipping probabilities
+    eps = 0.00001
+    clipped_probs = T.maximum(eps, T.minimum(1-eps, probs))
+    cost = -T.log(clipped_probs.flatten()[y_flat_idx])
+
     cost = cost.reshape([y.shape[0], y.shape[1]])
     cost = (cost * y_mask_f).sum(0)
 
@@ -370,11 +373,11 @@ def build_model(tparams, **kwargs):
         cost += alpha_reg
 
     # also building sampler for production ######
-    emb_sampler = tparams['Wemb'][x.flatten()]
+    emb_sampler = tparams["Wemb"][x.flatten()]
     emb_sampler = emb_sampler.reshape([n_timesteps, n_samples, kwargs["dim_emb"]])
     proj_sampler = layer_apply_funcs[kwargs["encoder"]](tparams, emb_sampler, prefix="encoder")
 
-    embr_sampler = tparams['Wemb'][xr.flatten()]
+    embr_sampler = tparams["Wemb"][xr.flatten()]
     embr_sampler = embr_sampler.reshape([n_timesteps, n_samples, kwargs["dim_emb"]])
     projr_sampler = layer_apply_funcs[kwargs["encoder"]](tparams, embr_sampler, prefix="encoder_r")
 
